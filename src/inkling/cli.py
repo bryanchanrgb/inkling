@@ -10,6 +10,7 @@ from rich.text import Text
 
 from .models import Answer, Question, Topic
 from .quiz_service import QuizService
+from .storage import Storage
 from .topic_service import TopicService
 
 
@@ -21,6 +22,7 @@ class CLI:
         self.console = Console()
         self.topic_service = TopicService()
         self.quiz_service = QuizService()
+        self.storage = Storage()
     
     def run(self):
         """Run the main CLI loop."""
@@ -31,7 +33,7 @@ class CLI:
         
         while True:
             self._show_main_menu()
-            choice = Prompt.ask("\n[bold]Select an option[/bold]", choices=["1", "2", "3", "4", "5"], default="5")
+            choice = Prompt.ask("\n[bold]Select an option[/bold]", choices=["1", "2", "3", "4", "5", "6"], default="6")
             
             try:
                 if choice == "1":
@@ -43,6 +45,8 @@ class CLI:
                 elif choice == "4":
                     self._view_quiz_history()
                 elif choice == "5":
+                    self._generate_additional_questions()
+                elif choice == "6":
                     self.console.print("\n[green]Goodbye![/green]")
                     self.topic_service.close()
                     break
@@ -61,7 +65,8 @@ class CLI:
         menu.add_row("2", "Start quiz for topic")
         menu.add_row("3", "View topics")
         menu.add_row("4", "View quiz history")
-        menu.add_row("5", "Exit")
+        menu.add_row("5", "Generate additional questions")
+        menu.add_row("6", "Exit")
         
         self.console.print("\n[bold]Main Menu[/bold]")
         self.console.print(menu)
@@ -165,8 +170,8 @@ class CLI:
                     border_style="yellow" if answer.is_correct else "red"
                 ))
             
-            if answer.confidence_score is not None:
-                self.console.print(f"[dim]Confidence: {answer.confidence_score:.2%}[/dim]")
+            if answer.understanding_score is not None:
+                self.console.print(f"[dim]Understanding Score: {answer.understanding_score}/5[/dim]")
             
             self.console.print()  # Blank line between questions
         
@@ -247,7 +252,7 @@ class CLI:
         
         for record in history:
             is_correct_text = Text("✓", style="green") if record['is_correct'] else Text("✗", style="red")
-            score_text = f"{record['confidence_score']:.0%}" if record['confidence_score'] else "N/A"
+            score_text = f"{record['understanding_score']}/5" if record['understanding_score'] else "N/A"
             
             question = record['question_text']
             if len(question) > 37:
@@ -285,7 +290,7 @@ class CLI:
         table.add_row("Correct Answers:", f"[green]{results['correct_answers']}[/green]")
         table.add_row("Incorrect Answers:", f"[red]{results['incorrect_answers']}[/red]")
         table.add_row("Score:", f"[bold]{results['score']:.1f}%[/bold]")
-        table.add_row("Average Confidence:", f"{results['average_confidence']:.1%}")
+        table.add_row("Average Understanding:", f"{results['average_understanding']:.1f}/5")
         
         self.console.print(table)
         
@@ -297,4 +302,55 @@ class CLI:
             self.console.print("\n[yellow]Good job! Keep practicing.[/yellow]")
         else:
             self.console.print("\n[red]Keep studying! You'll improve with practice.[/red]")
+    
+    def _generate_additional_questions(self):
+        """Generate additional questions for a topic."""
+        topics = self.topic_service.list_topics()
+        
+        if not topics:
+            self.console.print("\n[red]No topics found. Please create a topic first.[/red]")
+            return
+        
+        self.console.print("\n[bold cyan]Generate Additional Questions[/bold cyan]")
+        self._display_topics_table(topics)
+        
+        topic_choice = IntPrompt.ask(
+            "\nSelect a topic (enter number)",
+            choices=[str(i + 1) for i in range(len(topics))],
+            default="1"
+        )
+        
+        selected_topic = topics[int(topic_choice) - 1]
+        
+        self.console.print(f"\n[bold]Generating additional questions for: {selected_topic.name}[/bold]")
+        self.console.print("[dim]Analyzing learning gaps and existing questions...[/dim]")
+        
+        try:
+            with self.console.status("[bold green]Generating questions..."):
+                question_data = self.quiz_service.generate_additional_questions(selected_topic.id)
+            
+            if not question_data:
+                self.console.print("[yellow]No new questions were generated.[/yellow]")
+                return
+            
+            # Save questions to database
+            questions = []
+            for q_data in question_data:
+                question = Question(
+                    topic_id=selected_topic.id,
+                    question_text=q_data.get('question_text', ''),
+                    correct_answer=q_data.get('correct_answer', ''),
+                    subtopic=q_data.get('subtopic'),
+                    difficulty=q_data.get('difficulty')
+                )
+                question_id = self.storage.save_question(question)
+                question.id = question_id
+                questions.append(question)
+            
+            self.console.print(f"\n[green]✓ Generated {len(questions)} new questions![/green]")
+        
+        except ValueError as e:
+            self.console.print(f"[red]{str(e)}[/red]")
+        except Exception as e:
+            self.console.print(f"[red]Error generating questions: {str(e)}[/red]")
 

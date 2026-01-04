@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from .config import get_config
 from .models import Answer, Question, Topic
@@ -59,7 +59,7 @@ class Storage:
                 question_id INTEGER NOT NULL,
                 user_answer TEXT NOT NULL,
                 is_correct BOOLEAN NOT NULL,
-                confidence_score REAL,
+                understanding_score INTEGER,
                 feedback TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (question_id) REFERENCES questions(id)
@@ -228,25 +228,97 @@ class Storage:
             cursor.execute("""
                 UPDATE answers 
                 SET question_id = ?, user_answer = ?, is_correct = ?, 
-                    confidence_score = ?, feedback = ?, timestamp = ?
+                    understanding_score = ?, feedback = ?, timestamp = ?
                 WHERE id = ?
             """, (answer.question_id, answer.user_answer, answer.is_correct,
-                  answer.confidence_score, answer.feedback, 
+                  answer.understanding_score, answer.feedback, 
                   answer.timestamp or datetime.now(), answer.id))
             answer_id = answer.id
         else:
             cursor.execute("""
                 INSERT INTO answers (question_id, user_answer, is_correct, 
-                                   confidence_score, feedback, timestamp)
+                                   understanding_score, feedback, timestamp)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (answer.question_id, answer.user_answer, answer.is_correct,
-                  answer.confidence_score, answer.feedback, 
+                  answer.understanding_score, answer.feedback, 
                   answer.timestamp or datetime.now()))
             answer_id = cursor.lastrowid
         
         conn.commit()
         conn.close()
         return answer_id
+    
+    def get_question_answer_stats(self, topic_id: int) -> Dict[int, dict]:
+        """Get answer statistics for all questions in a topic.
+        
+        Args:
+            topic_id: ID of the topic
+            
+        Returns:
+            Dictionary mapping question_id to stats dict with:
+            - has_answers: bool (whether question has been answered)
+            - last_answer_correct: Optional[bool] (most recent answer correctness)
+            - total_answers: int (total number of answers)
+            - correct_answers: int (number of correct answers)
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Get all questions for the topic with their answer statistics in a single query
+        # Using window functions to get the most recent answer per question
+        cursor.execute("""
+            WITH LatestAnswers AS (
+                SELECT 
+                    question_id,
+                    is_correct,
+                    ROW_NUMBER() OVER (PARTITION BY question_id ORDER BY timestamp DESC) as rn
+                FROM answers
+                WHERE question_id IN (SELECT id FROM questions WHERE topic_id = ?)
+            ),
+            AnswerCounts AS (
+                SELECT 
+                    question_id,
+                    COUNT(*) as total_answers,
+                    SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_answers
+                FROM answers
+                WHERE question_id IN (SELECT id FROM questions WHERE topic_id = ?)
+                GROUP BY question_id
+            )
+            SELECT 
+                q.id as question_id,
+                la.is_correct as last_answer_correct,
+                COALESCE(ac.total_answers, 0) as total_answers,
+                COALESCE(ac.correct_answers, 0) as correct_answers
+            FROM questions q
+            LEFT JOIN LatestAnswers la ON q.id = la.question_id AND la.rn = 1
+            LEFT JOIN AnswerCounts ac ON q.id = ac.question_id
+            WHERE q.topic_id = ?
+        """, (topic_id, topic_id, topic_id))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # Build stats dictionary
+        stats = {}
+        for row in rows:
+            question_id = row['question_id']
+            last_correct = row['last_answer_correct']
+            total_answers = row['total_answers']
+            
+            # SQLite stores booleans as 0/1, convert to Python bool
+            last_correct_bool = None
+            if last_correct is not None:
+                last_correct_bool = bool(last_correct)
+            
+            stats[question_id] = {
+                'has_answers': total_answers > 0,
+                'last_answer_correct': last_correct_bool,
+                'total_answers': total_answers,
+                'correct_answers': row['correct_answers']
+            }
+        
+        return stats
     
     def get_quiz_history(self, topic_id: Optional[int] = None, limit: int = 10) -> List[dict]:
         """Get quiz history."""

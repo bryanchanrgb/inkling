@@ -33,7 +33,7 @@ class Answer:
     question_id: int = 0
     user_answer: str = ""
     is_correct: bool = False
-    confidence_score: Optional[float] = None
+    understanding_score: Optional[int] = None  # 1-5 scale: 1=nonexistent/incorrect, 2=some understanding, 3=partial, 4=correct with gaps, 5=perfect
     feedback: Optional[str] = None
     timestamp: Optional[datetime] = None
 

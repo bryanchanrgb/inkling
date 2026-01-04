@@ -212,4 +212,125 @@ class KnowledgeGraph:
                 """,
                 topic_name=topic_name
             )
+    
+    def question_exists(self, question_id: int) -> bool:
+        """Check if a question node already exists in the graph.
+        
+        Args:
+            question_id: The question ID to check
+            
+        Returns:
+            True if the question exists, False otherwise
+        """
+        with self.driver.session() as session:
+            result = session.run(
+                """
+                MATCH (q:Question {question_id: $question_id})
+                RETURN q
+                LIMIT 1
+                """,
+                question_id=question_id
+            )
+            return result.single() is not None
+    
+    def add_question_node(self, question, topic_name: str) -> None:
+        """Add a Question node to the knowledge graph.
+        
+        This method should be called when a user answers a question that doesn't
+        already exist in the graph. The node will contain question_id, question_text,
+        and correct_answer, with edges to the related Topic and Subtopic.
+        
+        Args:
+            question: Question object with id, question_text, correct_answer, subtopic
+            topic_name: Name of the topic this question belongs to
+        """
+        with self.driver.session() as session:
+            # Check if question already exists
+            if self.question_exists(question.id):
+                return  # Question already in graph, skip
+            
+            # Create Question node
+            session.run(
+                """
+                MERGE (q:Question {question_id: $question_id})
+                SET q.question_text = $question_text,
+                    q.correct_answer = $correct_answer
+                """,
+                question_id=question.id,
+                question_text=question.question_text,
+                correct_answer=question.correct_answer
+            )
+            
+            # Create edge to Topic
+            session.run(
+                """
+                MATCH (t:Topic {name: $topic_name})
+                MATCH (q:Question {question_id: $question_id})
+                MERGE (t)-[:HAS_QUESTION]->(q)
+                """,
+                topic_name=topic_name,
+                question_id=question.id
+            )
+            
+            # Create edge to Subtopic if subtopic exists
+            if question.subtopic:
+                session.run(
+                    """
+                    MATCH (s:Subtopic {name: $subtopic_name})
+                    MATCH (q:Question {question_id: $question_id})
+                    MERGE (s)-[:HAS_QUESTION]->(q)
+                    """,
+                    subtopic_name=question.subtopic,
+                    question_id=question.id
+                )
+    
+    def add_answer_node(self, answer, question) -> None:
+        """Add an Answer node to the knowledge graph.
+        
+        This method should be called whenever a user answers a question,
+        regardless of whether it has been answered before. The node will contain
+        answer_id, question_id, user_answer, and feedback, with an edge to the Question.
+        
+        Args:
+            answer: Answer object with id, question_id, user_answer, feedback
+            question: Question object with id
+        """
+        with self.driver.session() as session:
+            # Ensure Question node exists (create if it doesn't)
+            session.run(
+                """
+                MERGE (q:Question {question_id: $question_id})
+                ON CREATE SET q.question_text = $question_text,
+                             q.correct_answer = $correct_answer
+                """,
+                question_id=question.id,
+                question_text=question.question_text,
+                correct_answer=question.correct_answer
+            )
+            
+            # Create Answer node
+            session.run(
+                """
+                MERGE (a:Answer {answer_id: $answer_id})
+                SET a.question_id = $question_id,
+                    a.user_answer = $user_answer,
+                    a.feedback = $feedback,
+                    a.timestamp = datetime()
+                """,
+                answer_id=answer.id,
+                question_id=answer.question_id,
+                user_answer=answer.user_answer,
+                feedback=answer.feedback or ""
+            )
+            
+            # Create edge from Answer to Question
+            session.run(
+                """
+                MATCH (a:Answer {answer_id: $answer_id})
+                MATCH (q:Question {question_id: $question_id})
+                MERGE (a)-[:ANSWERS]->(q)
+                """,
+                answer_id=answer.id,
+                question_id=question.id
+            )
 

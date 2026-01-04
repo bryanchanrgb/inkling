@@ -17,13 +17,13 @@ ai:
     model: "llama2"
   # Generation parameters
   knowledge_graph:
-    temperature: 0.7
+    temperature: 0.0
     max_tokens: 2000
   question_generation:
-    temperature: 0.8
+    temperature: 0.0
     max_tokens: 4000
   grading:
-    temperature: 0.3
+    temperature: 0.0
     max_tokens: 1000
 
 # Neo4j Configuration
@@ -40,4 +40,5 @@ app:
   default_question_count: 10
   grading_strictness: "moderate"  # Options: strict, moderate, lenient
   quiz_questions_per_session: 5
+  additional_questions_count: 5
 
