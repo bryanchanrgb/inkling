@@ -1,11 +1,49 @@
 """Neo4j knowledge graph operations."""
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from neo4j import GraphDatabase
 
+from .ai_service import get_ai_service
 from .config import get_config
+
+
+# Knowledge graph generation prompts
+KNOWLEDGE_GRAPH_SYSTEM_MESSAGE = "You are a knowledge graph generator. Always return valid JSON only."
+
+KNOWLEDGE_GRAPH_PROMPT_TEMPLATE = """Generate a knowledge graph structure for the topic: "{topic_name}".
+
+Create a hierarchical structure with:
+1. Main subtopics (3-7 subtopics)
+2. Relationships between subtopics (prerequisites, related topics)
+3. Brief descriptions for each subtopic
+
+Return a JSON object with this structure:
+{{
+    "subtopics": [
+        {{
+            "name": "Subtopic Name",
+            "description": "Brief description",
+            "prerequisites": ["Other subtopic name"],
+            "related": ["Related subtopic name"]
+        }}
+    ]
+}}
+
+Only return the JSON, no additional text."""
+
+
+def _extract_json_content(content: str) -> str:
+    """Extract JSON from response content, removing markdown code blocks if present."""
+    content = content.strip()
+    if content.startswith("```"):
+        content = content.split("```")[1]
+        if content.startswith("json"):
+            content = content[4:]
+        content = content.strip()
+    return content
 
 
 class KnowledgeGraph:
@@ -30,6 +68,37 @@ class KnowledgeGraph:
         password = neo4j_config.get('password', 'password')
         
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
+        self.ai_service = get_ai_service()
+        self.config = config
+    
+    def generate_knowledge_graph_structure(self, topic_name: str) -> Dict[str, Any]:
+        """Generate a knowledge graph structure for a topic using AI.
+        
+        Args:
+            topic_name: Name of the topic to generate a knowledge graph for
+            
+        Returns:
+            Dictionary containing the knowledge graph structure with subtopics
+        """
+        # Get generation parameters from config
+        kg_config = self.config.get('ai.knowledge_graph', {})
+        temperature = kg_config.get('temperature', 0.7)
+        max_tokens = kg_config.get('max_tokens', 2000)
+        
+        # Generate prompt
+        prompt = KNOWLEDGE_GRAPH_PROMPT_TEMPLATE.format(topic_name=topic_name)
+        
+        # Call AI model
+        response = self.ai_service.call_model(
+            system_message=KNOWLEDGE_GRAPH_SYSTEM_MESSAGE,
+            user_message=prompt,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+        
+        # Extract and parse JSON
+        content = _extract_json_content(response)
+        return json.loads(content)
     
     def close(self):
         """Close the database connection."""

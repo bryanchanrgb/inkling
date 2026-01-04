@@ -15,6 +15,16 @@ ai:
   local:
     base_url: "http://localhost:11434"  # Ollama default
     model: "llama2"
+  # Generation parameters
+  knowledge_graph:
+    temperature: 0.7
+    max_tokens: 2000
+  question_generation:
+    temperature: 0.8
+    max_tokens: 4000
+  grading:
+    temperature: 0.3
+    max_tokens: 1000
 
 # Neo4j Configuration
 neo4j:

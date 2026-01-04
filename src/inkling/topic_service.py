@@ -3,7 +3,6 @@
 from datetime import datetime
 from typing import List, Tuple
 
-from .ai_service import get_ai_service
 from .config import get_config
 from .knowledge_graph import KnowledgeGraph
 from .models import Question, Topic
@@ -15,7 +14,6 @@ class TopicService:
     
     def __init__(self):
         """Initialize topic service."""
-        self.ai_service = get_ai_service()
         self.knowledge_graph = KnowledgeGraph()
         self.storage = Storage()
         self.config = get_config()
@@ -35,14 +33,16 @@ class TopicService:
             raise ValueError(f"Topic '{topic_name}' already exists")
         
         # Step 1: Generate knowledge graph structure using AI
-        graph_structure = self.ai_service.generate_knowledge_graph(topic_name)
+        graph_structure = self.knowledge_graph.generate_knowledge_graph_structure(topic_name)
         
         # Step 2: Store knowledge graph in Neo4j
         graph_id = self.knowledge_graph.create_topic_graph(topic_name, graph_structure)
         
         # Step 3: Generate questions using AI
+        from .quiz_service import QuizService
+        quiz_service = QuizService()
         question_count = self.config.get_app_config().get('default_question_count', 10)
-        question_data = self.ai_service.generate_questions(topic_name, graph_structure, count=question_count)
+        question_data = quiz_service.generate_questions(topic_name, graph_structure, count=question_count)
         
         # Step 4: Create topic in database
         topic = Topic(
