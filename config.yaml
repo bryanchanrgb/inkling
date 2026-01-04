@@ -28,11 +28,8 @@ ai:
 
 # Neo4j Configuration
 neo4j:
-  embedded: true
-  data_directory: "data/neo4j"
-  uri: "bolt://localhost:7687"
-  username: "neo4j"
-  password: "password"
+  uri: "neo4j://127.0.0.1:7687"  # Neo4j connection URI
+  # Username and password should be set via NEO4J_USERNAME and NEO4J_PASSWORD environment variables
 
 # Storage Configuration
 storage:

@@ -1,7 +1,7 @@
 """Neo4j knowledge graph operations."""
 
 import json
-from pathlib import Path
+import os
 from typing import Any, Dict, List, Optional
 
 from neo4j import GraphDatabase
@@ -50,22 +50,17 @@ class KnowledgeGraph:
     """Manages Neo4j knowledge graph operations."""
     
     def __init__(self):
-        """Initialize Neo4j connection."""
+        """Initialize Neo4j connection to local instance."""
         config = get_config()
         neo4j_config = config.get_neo4j_config()
         
-        if neo4j_config.get('embedded', False):
-            # For embedded mode, we'll use a local database
-            data_dir = Path(neo4j_config.get('data_directory', 'data/neo4j'))
-            data_dir.mkdir(parents=True, exist_ok=True)
-            # Note: Embedded Neo4j requires Java and specific setup
-            # For now, we'll use a regular connection to a local instance
-            uri = neo4j_config.get('uri', 'bolt://localhost:7687')
-        else:
-            uri = neo4j_config.get('uri', 'bolt://localhost:7687')
+        # Get connection URI (defaults to localhost)
+        uri = neo4j_config.get('uri', 'bolt://localhost:7687')
         
-        username = neo4j_config.get('username', 'neo4j')
-        password = neo4j_config.get('password', 'password')
+        # Get credentials from environment variables
+        # dotenv is already loaded in config.py
+        username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        password = os.getenv('NEO4J_PASSWORD', 'password')
         
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
         self.ai_service = get_ai_service()

@@ -71,7 +71,9 @@ class Config:
     
     def get_neo4j_config(self) -> Dict[str, Any]:
         """Get Neo4j configuration."""
-        return self.get('neo4j', {})
+        config = self.get('neo4j', {})
+        # Username and password are loaded from environment variables in knowledge_graph.py
+        return config
     
     def get_storage_config(self) -> Dict[str, Any]:
         """Get storage configuration."""
