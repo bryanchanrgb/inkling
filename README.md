@@ -60,6 +60,66 @@ python main.py
 
 4. **View Quiz History**: Review past quiz attempts and performance
 
+## Data Flow
+
+### Topic Creation Flow
+
+When creating a new topic, the system follows this sequence:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant TopicService
+    participant AIService
+    participant KnowledgeGraph
+    participant Storage
+    
+    User->>CLI: Create topic "Machine Learning"
+    CLI->>TopicService: create_topic("Machine Learning")
+    TopicService->>AIService: generate_knowledge_graph("Machine Learning")
+    AIService-->>TopicService: Graph structure (subtopics, relationships)
+    TopicService->>KnowledgeGraph: store_graph(graph)
+    TopicService->>AIService: generate_questions(graph, count=10)
+    AIService-->>TopicService: Question bank
+    TopicService->>Storage: save_topic() + save_questions()
+    Storage-->>TopicService: Topic ID
+    TopicService-->>CLI: Success
+    CLI-->>User: Topic created with N questions
+```
+
+### Quiz Flow
+
+When taking a quiz, the system follows this sequence:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant QuizService
+    participant Storage
+    participant AIService
+    
+    User->>CLI: Start quiz for topic
+    CLI->>QuizService: start_quiz(topic_id)
+    QuizService->>Storage: get_questions(topic_id)
+    Storage-->>QuizService: Questions list
+    loop For each question
+        QuizService->>CLI: display_question(question)
+        CLI->>User: Show question
+        User->>CLI: Enter answer
+        CLI->>QuizService: submit_answer(question_id, user_answer)
+        QuizService->>AIService: grade_answer(question, correct_answer, user_answer)
+        AIService-->>QuizService: is_correct, confidence_score, feedback
+        QuizService->>Storage: save_answer(question_id, user_answer, result)
+        QuizService->>CLI: show_feedback(is_correct, feedback)
+        CLI->>User: Display feedback
+    end
+    QuizService->>Storage: save_quiz_session(results)
+    QuizService-->>CLI: Quiz complete
+    CLI->>User: Show summary
+```
+
 ## Configuration
 
 Edit `config.yaml` to customize:
