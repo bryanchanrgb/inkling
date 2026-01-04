@@ -2,13 +2,16 @@
 
 # AI Provider Configuration
 ai:
-  provider: "openai"  # Options: openai, anthropic, local
+  provider: "openrouter"  # Options: openai, anthropic, openrouter, local
   openai:
     model: "gpt-4"
     api_key: null  # Set via OPENAI_API_KEY environment variable
   anthropic:
     model: "claude-3-sonnet-20240229"
     api_key: null  # Set via ANTHROPIC_API_KEY environment variable
+  openrouter:
+    model: "openai/gpt-4"
+    api_key: null  # Set via OPENROUTER_API_KEY environment variable
   local:
     base_url: "http://localhost:11434"  # Ollama default
     model: "llama2"

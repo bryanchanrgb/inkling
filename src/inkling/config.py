@@ -62,6 +62,10 @@ class Config:
             api_key = os.getenv('ANTHROPIC_API_KEY')
             if api_key:
                 config['api_key'] = api_key
+        elif provider == 'openrouter':
+            api_key = os.getenv('OPENROUTER_API_KEY')
+            if api_key:
+                config['api_key'] = api_key
         
         return config
     
