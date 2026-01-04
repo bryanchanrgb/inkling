@@ -1,0 +1,33 @@
+# Inkling Configuration
+
+# AI Provider Configuration
+ai:
+  provider: "openai"  # Options: openai, anthropic, local
+  openai:
+    model: "gpt-4"
+    api_key: null  # Set via OPENAI_API_KEY environment variable
+  anthropic:
+    model: "claude-3-sonnet-20240229"
+    api_key: null  # Set via ANTHROPIC_API_KEY environment variable
+  local:
+    base_url: "http://localhost:11434"  # Ollama default
+    model: "llama2"
+
+# Neo4j Configuration
+neo4j:
+  embedded: true
+  data_directory: "data/neo4j"
+  uri: "bolt://localhost:7687"
+  username: "neo4j"
+  password: "password"
+
+# Storage Configuration
+storage:
+  database_path: "data/inkling.db"
+
+# Application Settings
+app:
+  default_question_count: 10
+  grading_strictness: "moderate"  # Options: strict, moderate, lenient
+  quiz_questions_per_session: 5
+
