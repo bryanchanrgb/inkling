@@ -37,8 +37,8 @@ storage:
 
 # Application Settings
 app:
-  default_question_count: 10
+  default_question_count: 10  # Number of questions to generate for a topic
+  additional_questions_count: 10  # Number of additional questions to generate for a topic
   grading_strictness: "moderate"  # Options: strict, moderate, lenient
-  quiz_questions_per_session: 5
-  additional_questions_count: 5
+  quiz_questions_per_session: 5  # Number of questions to ask in a quiz session
 
