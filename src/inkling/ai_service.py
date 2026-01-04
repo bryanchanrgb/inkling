@@ -125,7 +125,7 @@ class OpenAIProvider(AIProvider):
         if not api_key:
             raise ValueError("OpenAI API key not found. Set OPENAI_API_KEY environment variable.")
         self.client = OpenAI(api_key=api_key)
-        self.model = config.get('model', 'gpt-4')
+        self.model = config.get('model', 'gpt-5-mini')
     
     def generate_knowledge_graph(self, topic_name: str) -> Dict[str, Any]:
         """Generate a knowledge graph structure for a topic."""
@@ -277,7 +277,7 @@ class OpenRouterProvider(AIProvider):
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1"
         )
-        self.model = config.get('model', 'openai/gpt-4')
+        self.model = config.get('model', 'openai/gpt-5-mini')
     
     def generate_knowledge_graph(self, topic_name: str) -> Dict[str, Any]:
         """Generate a knowledge graph structure for a topic."""
