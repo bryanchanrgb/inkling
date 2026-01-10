@@ -1,13 +1,17 @@
-"""Neo4j knowledge graph operations."""
+"""Knowledge graph operations using SQLite by default, with optional Neo4j support."""
 
 import json
 import os
 from typing import Any, Dict, List, Optional
 
-from neo4j import GraphDatabase
+try:
+    from neo4j import GraphDatabase
+except ImportError:
+    GraphDatabase = None  # Neo4j is optional
 
 from .ai_service import get_ai_service
 from .config import get_config
+from .storage import Storage
 
 
 # Knowledge graph generation prompts
@@ -47,24 +51,13 @@ def _extract_json_content(content: str) -> str:
 
 
 class KnowledgeGraph:
-    """Manages Neo4j knowledge graph operations."""
+    """Manages knowledge graph operations using SQLite storage."""
     
     def __init__(self):
-        """Initialize Neo4j connection to local instance."""
-        config = get_config()
-        neo4j_config = config.get_neo4j_config()
-        
-        # Get connection URI (defaults to localhost)
-        uri = neo4j_config.get('uri', 'bolt://localhost:7687')
-        
-        # Get credentials from environment variables
-        # dotenv is already loaded in config.py
-        username = os.getenv('NEO4J_USERNAME', 'neo4j')
-        password = os.getenv('NEO4J_PASSWORD', 'password')
-        
-        self.driver = GraphDatabase.driver(uri, auth=(username, password))
+        """Initialize knowledge graph with SQLite storage."""
         self.ai_service = get_ai_service()
-        self.config = config
+        self.config = get_config()
+        self.storage = Storage()
     
     def generate_knowledge_graph_structure(self, topic_name: str) -> Dict[str, Any]:
         """Generate a knowledge graph structure for a topic using AI.
@@ -96,12 +89,145 @@ class KnowledgeGraph:
         return json.loads(content)
     
     def close(self):
-        """Close the database connection."""
+        """Close any connections (no-op for SQLite)."""
+        pass
+    
+    def create_topic_graph(self, topic_name: str, graph_structure: Dict[str, Any]) -> str:
+        """Create a knowledge graph for a topic in SQLite.
+        
+        Args:
+            topic_name: Name of the topic
+            graph_structure: Knowledge graph structure dictionary
+            
+        Returns:
+            The graph ID (topic name used as identifier)
+        """
+        # Get topic from database
+        topic = self.storage.get_topic_by_name(topic_name)
+        if not topic or not topic.id:
+            raise ValueError(f"Topic '{topic_name}' not found in database")
+        
+        # Save subtopics and relationships to SQLite
+        self.storage.save_subtopics(topic.id, graph_structure)
+        
+        return topic_name
+    
+    def get_subtopics(self, topic_name: str) -> List[Dict[str, Any]]:
+        """Get all subtopics for a topic.
+        
+        Args:
+            topic_name: Name of the topic
+            
+        Returns:
+            List of dictionaries with 'name' and 'description'
+        """
+        topic = self.storage.get_topic_by_name(topic_name)
+        if not topic or not topic.id:
+            return []
+        
+        return self.storage.get_subtopics(topic.id)
+    
+    def get_related_topics(self, subtopic_name: str, topic_name: Optional[str] = None) -> List[str]:
+        """Get topics related to a subtopic.
+        
+        Args:
+            subtopic_name: Name of the subtopic
+            topic_name: Optional name of the topic (required if multiple topics have same subtopic name)
+            
+        Returns:
+            List of related subtopic names
+        """
+        if topic_name:
+            topic = self.storage.get_topic_by_name(topic_name)
+            if not topic or not topic.id:
+                return []
+            return self.storage.get_related_topics(topic.id, subtopic_name)
+        else:
+            # If topic_name not provided, search all topics (less efficient)
+            # This maintains backward compatibility but is not ideal
+            topics = self.storage.list_topics()
+            for topic in topics:
+                if topic.id:
+                    related = self.storage.get_related_topics(topic.id, subtopic_name)
+                    if related:
+                        return related
+            return []
+    
+    def get_prerequisites(self, subtopic_name: str, topic_name: Optional[str] = None) -> List[str]:
+        """Get prerequisites for a subtopic.
+        
+        Args:
+            subtopic_name: Name of the subtopic
+            topic_name: Optional name of the topic (required if multiple topics have same subtopic name)
+            
+        Returns:
+            List of prerequisite subtopic names
+        """
+        if topic_name:
+            topic = self.storage.get_topic_by_name(topic_name)
+            if not topic or not topic.id:
+                return []
+            return self.storage.get_prerequisites(topic.id, subtopic_name)
+        else:
+            # If topic_name not provided, search all topics (less efficient)
+            topics = self.storage.list_topics()
+            for topic in topics:
+                if topic.id:
+                    prerequisites = self.storage.get_prerequisites(topic.id, subtopic_name)
+                    if prerequisites:
+                        return prerequisites
+            return []
+    
+    def delete_topic_graph(self, topic_name: str) -> None:
+        """Delete a topic's knowledge graph (subtopics and relationships).
+        
+        Args:
+            topic_name: Name of the topic
+        """
+        topic = self.storage.get_topic_by_name(topic_name)
+        if topic and topic.id:
+            self.storage.delete_topic_graph(topic.id)
+
+
+class Neo4jKnowledgeGraph:
+    """Optional Neo4j knowledge graph operations (not used by default).
+    
+    This class contains all the Neo4j-specific functionality that was previously
+    in the main KnowledgeGraph class. These methods are not called in the default
+    flow but can be used if Neo4j integration is needed.
+    """
+    
+    def __init__(self):
+        """Initialize Neo4j connection to local instance."""
+        if GraphDatabase is None:
+            raise ImportError("neo4j package is not installed. Install it with: pip install neo4j")
+        
+        config = get_config()
+        neo4j_config = config.get_neo4j_config()
+        
+        # Get connection URI (defaults to localhost)
+        uri = neo4j_config.get('uri', 'bolt://localhost:7687')
+        
+        # Get credentials from environment variables
+        # dotenv is already loaded in config.py
+        username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        password = os.getenv('NEO4J_PASSWORD', 'password')
+        
+        self.driver = GraphDatabase.driver(uri, auth=(username, password))
+        self.ai_service = get_ai_service()
+        self.config = config
+    
+    def close(self):
+        """Close the Neo4j database connection."""
         self.driver.close()
     
     def create_topic_graph(self, topic_name: str, graph_structure: Dict[str, Any]) -> str:
-        """Create a knowledge graph for a topic.
+        """Create a knowledge graph for a topic in Neo4j.
         
+        Args:
+            topic_name: Name of the topic
+            graph_structure: Knowledge graph structure dictionary
+            
         Returns:
             The graph ID (topic name used as identifier)
         """
@@ -165,7 +291,7 @@ class KnowledgeGraph:
             return topic_name
     
     def get_subtopics(self, topic_name: str) -> List[Dict[str, Any]]:
-        """Get all subtopics for a topic."""
+        """Get all subtopics for a topic from Neo4j."""
         with self.driver.session() as session:
             result = session.run(
                 """
@@ -178,7 +304,7 @@ class KnowledgeGraph:
             return [dict(record) for record in result]
     
     def get_related_topics(self, subtopic_name: str) -> List[str]:
-        """Get topics related to a subtopic."""
+        """Get topics related to a subtopic from Neo4j."""
         with self.driver.session() as session:
             result = session.run(
                 """
@@ -190,7 +316,7 @@ class KnowledgeGraph:
             return [record['name'] for record in result]
     
     def get_prerequisites(self, subtopic_name: str) -> List[str]:
-        """Get prerequisites for a subtopic."""
+        """Get prerequisites for a subtopic from Neo4j."""
         with self.driver.session() as session:
             result = session.run(
                 """
@@ -202,7 +328,7 @@ class KnowledgeGraph:
             return [record['name'] for record in result]
     
     def delete_topic_graph(self, topic_name: str) -> None:
-        """Delete a topic and all its subtopics and relationships."""
+        """Delete a topic and all its subtopics and relationships from Neo4j."""
         with self.driver.session() as session:
             session.run(
                 """
@@ -214,7 +340,7 @@ class KnowledgeGraph:
             )
     
     def question_exists(self, question_id: int) -> bool:
-        """Check if a question node already exists in the graph.
+        """Check if a question node already exists in the Neo4j graph.
         
         Args:
             question_id: The question ID to check
@@ -234,7 +360,7 @@ class KnowledgeGraph:
             return result.single() is not None
     
     def add_question_node(self, question, topic_name: str) -> None:
-        """Add a Question node to the knowledge graph.
+        """Add a Question node to the Neo4j knowledge graph.
         
         This method should be called when a user answers a question that doesn't
         already exist in the graph. The node will contain question_id, question_text,
@@ -285,7 +411,7 @@ class KnowledgeGraph:
                 )
     
     def add_answer_node(self, answer, question) -> None:
-        """Add an Answer node to the knowledge graph.
+        """Add an Answer node to the Neo4j knowledge graph.
         
         This method should be called whenever a user answers a question,
         regardless of whether it has been answered before. The node will contain
@@ -333,4 +459,3 @@ class KnowledgeGraph:
                 answer_id=answer.id,
                 question_id=question.id
             )
-

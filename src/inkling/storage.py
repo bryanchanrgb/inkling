@@ -3,7 +3,7 @@
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .config import get_config
 from .models import Answer, Question, Topic
@@ -79,6 +79,37 @@ class Storage:
                 FOREIGN KEY (topic_id) REFERENCES topics(id)
             )
         """)
+        
+        # Subtopics table for knowledge graph
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subtopics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (topic_id) REFERENCES topics(id),
+                UNIQUE(topic_id, name)
+            )
+        """)
+        
+        # Subtopic relationships table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS subtopic_relationships (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subtopic_id INTEGER NOT NULL,
+                related_subtopic_id INTEGER NOT NULL,
+                relationship_type TEXT NOT NULL,
+                FOREIGN KEY (subtopic_id) REFERENCES subtopics(id),
+                FOREIGN KEY (related_subtopic_id) REFERENCES subtopics(id),
+                CHECK (relationship_type IN ('PREREQUISITE', 'RELATED_TO'))
+            )
+        """)
+        
+        # Create indexes for better query performance
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subtopics_topic_id ON subtopics(topic_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subtopic_relationships_subtopic ON subtopic_relationships(subtopic_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_subtopic_relationships_related ON subtopic_relationships(related_subtopic_id)")
         
         conn.commit()
         conn.close()
@@ -350,4 +381,214 @@ class Storage:
         conn.close()
         
         return [dict(row) for row in rows]
+    
+    def save_subtopics(self, topic_id: int, graph_structure: dict) -> None:
+        """Save subtopics and relationships from a knowledge graph structure.
+        
+        Args:
+            topic_id: ID of the topic
+            graph_structure: Dictionary with 'subtopics' list, each containing:
+                - name: str
+                - description: str (optional)
+                - prerequisites: List[str] (optional)
+                - related: List[str] (optional)
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        subtopics = graph_structure.get('subtopics', [])
+        
+        # First, create a mapping of subtopic names to their IDs
+        subtopic_name_to_id = {}
+        
+        for subtopic_data in subtopics:
+            subtopic_name = subtopic_data.get('name')
+            description = subtopic_data.get('description', '')
+            
+            # Insert or update subtopic
+            cursor.execute("""
+                INSERT INTO subtopics (topic_id, name, description)
+                VALUES (?, ?, ?)
+                ON CONFLICT(topic_id, name) DO UPDATE SET
+                    description = excluded.description
+            """, (topic_id, subtopic_name, description))
+            
+            # Get the subtopic ID
+            cursor.execute("""
+                SELECT id FROM subtopics WHERE topic_id = ? AND name = ?
+            """, (topic_id, subtopic_name))
+            result = cursor.fetchone()
+            if result:
+                subtopic_name_to_id[subtopic_name] = result[0]
+        
+        # Now create relationships
+        for subtopic_data in subtopics:
+            subtopic_name = subtopic_data.get('name')
+            subtopic_id = subtopic_name_to_id.get(subtopic_name)
+            
+            if not subtopic_id:
+                continue
+            
+            # Create prerequisite relationships
+            prerequisites = subtopic_data.get('prerequisites', [])
+            for prereq_name in prerequisites:
+                prereq_id = subtopic_name_to_id.get(prereq_name)
+                if prereq_id and prereq_id != subtopic_id:
+                    # Prerequisite means: prereq -> subtopic (prereq is prerequisite FOR subtopic)
+                    cursor.execute("""
+                        INSERT INTO subtopic_relationships (subtopic_id, related_subtopic_id, relationship_type)
+                        VALUES (?, ?, 'PREREQUISITE')
+                        ON CONFLICT DO NOTHING
+                    """, (prereq_id, subtopic_id))
+            
+            # Create related relationships (bidirectional)
+            related = subtopic_data.get('related', [])
+            for related_name in related:
+                related_id = subtopic_name_to_id.get(related_name)
+                if related_id and related_id != subtopic_id:
+                    # Related is bidirectional, but we'll store it once
+                    cursor.execute("""
+                        INSERT INTO subtopic_relationships (subtopic_id, related_subtopic_id, relationship_type)
+                        VALUES (?, ?, 'RELATED_TO')
+                        ON CONFLICT DO NOTHING
+                    """, (subtopic_id, related_id))
+        
+        conn.commit()
+        conn.close()
+    
+    def get_subtopics(self, topic_id: int) -> List[Dict[str, Any]]:
+        """Get all subtopics for a topic.
+        
+        Args:
+            topic_id: ID of the topic
+            
+        Returns:
+            List of dictionaries with 'name' and 'description'
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT name, description
+            FROM subtopics
+            WHERE topic_id = ?
+            ORDER BY name
+        """, (topic_id,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [{'name': row['name'], 'description': row['description']} for row in rows]
+    
+    def get_related_topics(self, topic_id: int, subtopic_name: str) -> List[str]:
+        """Get topics related to a subtopic.
+        
+        Args:
+            topic_id: ID of the topic
+            subtopic_name: Name of the subtopic
+            
+        Returns:
+            List of related subtopic names
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Get the subtopic ID
+        cursor.execute("""
+            SELECT id FROM subtopics WHERE topic_id = ? AND name = ?
+        """, (topic_id, subtopic_name))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            return []
+        
+        subtopic_id = result[0]
+        
+        # Get related subtopics (both directions)
+        cursor.execute("""
+            SELECT DISTINCT s.name
+            FROM subtopics s
+            JOIN subtopic_relationships sr ON (
+                (sr.subtopic_id = ? AND sr.related_subtopic_id = s.id) OR
+                (sr.related_subtopic_id = ? AND sr.subtopic_id = s.id)
+            )
+            WHERE sr.relationship_type = 'RELATED_TO'
+            AND s.topic_id = ?
+        """, (subtopic_id, subtopic_id, topic_id))
+        
+        related = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        return related
+    
+    def get_prerequisites(self, topic_id: int, subtopic_name: str) -> List[str]:
+        """Get prerequisites for a subtopic.
+        
+        Args:
+            topic_id: ID of the topic
+            subtopic_name: Name of the subtopic
+            
+        Returns:
+            List of prerequisite subtopic names
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Get the subtopic ID
+        cursor.execute("""
+            SELECT id FROM subtopics WHERE topic_id = ? AND name = ?
+        """, (topic_id, subtopic_name))
+        result = cursor.fetchone()
+        
+        if not result:
+            conn.close()
+            return []
+        
+        subtopic_id = result[0]
+        
+        # Get prerequisites (prerequisite -> subtopic means subtopic requires prerequisite)
+        cursor.execute("""
+            SELECT s.name
+            FROM subtopics s
+            JOIN subtopic_relationships sr ON sr.subtopic_id = s.id
+            WHERE sr.related_subtopic_id = ?
+            AND sr.relationship_type = 'PREREQUISITE'
+            AND s.topic_id = ?
+        """, (subtopic_id, topic_id))
+        
+        prerequisites = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        return prerequisites
+    
+    def delete_topic_graph(self, topic_id: int) -> None:
+        """Delete all subtopics and relationships for a topic.
+        
+        Args:
+            topic_id: ID of the topic
+        """
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Get all subtopic IDs for this topic
+        cursor.execute("SELECT id FROM subtopics WHERE topic_id = ?", (topic_id,))
+        subtopic_ids = [row[0] for row in cursor.fetchall()]
+        
+        if subtopic_ids:
+            placeholders = ','.join('?' * len(subtopic_ids))
+            # Delete relationships
+            cursor.execute(f"""
+                DELETE FROM subtopic_relationships
+                WHERE subtopic_id IN ({placeholders}) OR related_subtopic_id IN ({placeholders})
+            """, subtopic_ids + subtopic_ids)
+            
+            # Delete subtopics
+            cursor.execute(f"""
+                DELETE FROM subtopics WHERE id IN ({placeholders})
+            """, subtopic_ids)
+        
+        conn.commit()
+        conn.close()
 

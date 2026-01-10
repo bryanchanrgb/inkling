@@ -35,24 +35,26 @@ class TopicService:
         # Step 1: Generate knowledge graph structure using AI
         graph_structure = self.knowledge_graph.generate_knowledge_graph_structure(topic_name)
         
-        # Step 2: Store knowledge graph in Neo4j
-        graph_id = self.knowledge_graph.create_topic_graph(topic_name, graph_structure)
-        
-        # Step 3: Generate questions using AI
-        from .quiz_service import QuizService
-        quiz_service = QuizService()
-        question_count = self.config.get_app_config().get('default_question_count', 10)
-        question_data = quiz_service.generate_questions(topic_name, graph_structure, count=question_count)
-        
-        # Step 4: Create topic in database
+        # Step 2: Create topic in database first (needed before creating graph)
         topic = Topic(
             name=topic_name,
             description=f"Knowledge graph with {len(graph_structure.get('subtopics', []))} subtopics",
             created_at=datetime.now(),
-            knowledge_graph_id=graph_id
+            knowledge_graph_id=None  # Will be set after graph is created
         )
         topic_id = self.storage.save_topic(topic)
         topic.id = topic_id
+        
+        # Step 3: Store knowledge graph in SQLite database
+        graph_id = self.knowledge_graph.create_topic_graph(topic_name, graph_structure)
+        topic.knowledge_graph_id = graph_id
+        self.storage.save_topic(topic)  # Update with graph_id
+        
+        # Step 4: Generate questions using AI
+        from .quiz_service import QuizService
+        quiz_service = QuizService()
+        question_count = self.config.get_app_config().get('default_question_count', 10)
+        question_data = quiz_service.generate_questions(topic_name, graph_structure, count=question_count)
         
         # Step 5: Create questions in database
         questions = []

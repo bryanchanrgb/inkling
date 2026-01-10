@@ -457,22 +457,8 @@ class QuizService:
         answer_id = self.storage.save_answer(answer)
         answer.id = answer_id
         
-        # Update knowledge graph
-        try:
-            # Get topic name for knowledge graph
-            topic = self.storage.get_topic(question.topic_id)
-            if topic:
-                topic_name = topic.name
-                
-                # Add question node if it doesn't exist
-                if not self.knowledge_graph.question_exists(question.id):
-                    self.knowledge_graph.add_question_node(question, topic_name)
-                
-                # Always add answer node
-                self.knowledge_graph.add_answer_node(answer, question)
-        except Exception as e:
-            # Log error but don't fail the grading if knowledge graph update fails
-            print(f"Warning: Failed to update knowledge graph: {str(e)}")
+        # Note: Questions and answers are stored in SQLite via the storage layer.
+        # If Neo4j integration is needed, use Neo4jKnowledgeGraph class separately.
         
         return answer
     
