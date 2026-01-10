@@ -2,6 +2,33 @@
 
 This guide will help you set up and run the Inkling web application with React frontend and FastAPI backend.
 
+## Quick Start
+
+Get up and running in 5 minutes:
+
+1. **Install Backend Dependencies:**
+   ```bash
+   pip install -e .
+   ```
+
+2. **Install Frontend Dependencies:**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+3. **Start the Application:**
+   - **Windows:** `start_dev.bat`
+   - **Linux/Mac:** `chmod +x start_dev.sh && ./start_dev.sh`
+   - **Or manually:** Run `python run_api.py` in one terminal and `cd frontend && npm start` in another
+
+4. **Open in Browser:** http://localhost:3000
+
+For detailed instructions, continue reading below.
+
+---
+
 ## Prerequisites
 
 - Python 3.10 or higher
@@ -92,14 +119,73 @@ Open your browser and navigate to:
 - **Frontend:** http://localhost:3000
 - **API Documentation:** http://localhost:8000/docs (FastAPI auto-generated docs)
 
+## Exposing to Public Internet (ngrok)
+
+To access your application from other devices or share it with others, you can use ngrok to create a secure tunnel to your local server.
+
+### Installing ngrok
+
+1. **Download ngrok:**
+   - Visit [ngrok.com/download](https://ngrok.com/download)
+   - Download for your operating system (Windows, macOS, or Linux)
+   - Extract the executable to a location in your PATH, or keep it in a convenient directory
+
+2. **Sign up for a free account:**
+   - Go to [ngrok.com/signup](https://ngrok.com/signup)
+   - Create a free account (required for custom domains and longer sessions)
+
+3. **Authenticate:**
+   ```bash
+   ngrok config add-authtoken YOUR_AUTH_TOKEN
+   ```
+   (Get your auth token from the ngrok dashboard after signing up)
+
+### Exposing the Application
+
+Since your React app proxies API requests to the backend, you only need to expose the frontend port (3000):
+
+1. **Start your application** (backend and frontend) as described in Step 4
+
+2. **In a new terminal, start ngrok:**
+   ```bash
+   ngrok http 3000
+   ```
+
+3. **Copy the public URL:**
+   ngrok will display a forwarding URL like:
+   ```
+   Forwarding  https://abc123.ngrok-free.app -> http://localhost:3000
+   ```
+
+4. **Access from any device:**
+   - Open the `https://` URL on any device (phone, tablet, another computer)
+   - The React dev server will proxy API requests to your local backend automatically
+
+### ngrok Tips
+
+- **Free tier limitations:** Free accounts have session time limits and random URLs each time
+- **Custom domains:** Paid plans allow custom domains and reserved URLs
+- **HTTPS:** ngrok provides HTTPS automatically (required for some mobile features)
+- **Inspect traffic:** Visit http://localhost:4040 to see requests going through ngrok
+- **Keep it running:** Keep the ngrok terminal open while you want the public URL active
+
+### Security Note
+
+When exposing your application publicly:
+- Only expose during development/testing
+- Don't expose production applications without proper security measures
+- Be aware that anyone with the ngrok URL can access your application
+- Consider using ngrok's IP restrictions or authentication features for sensitive applications
+
 ## Features
 
 The web application provides:
 
-1. **Topics Page** - View all learning topics, start quizzes, and generate additional questions
-2. **Create Topic** - Create new topics with AI-generated knowledge graphs and questions
+1. **Topics Page** - View all learning topics, start quizzes, and view progress
+2. **Create Topic** - Create new topics with AI-generated subtopics and questions
 3. **Quiz Interface** - Take interactive quizzes with immediate feedback
 4. **Quiz History** - View your quiz history and performance
+5. **Progress Tracking** - View your progress by subtopic within each topic
 
 ## Mobile Support
 
@@ -132,6 +218,12 @@ The application is fully responsive and works on:
 - Check browser console for error messages
 - Verify the API base URL in `frontend/src/services/api.js`
 
+### ngrok Issues
+- Make sure ngrok is authenticated: `ngrok config check`
+- Verify your application is running on port 3000 before starting ngrok
+- Check the ngrok web interface at http://localhost:4040 for connection status
+- Ensure your firewall allows ngrok connections
+
 ## Production Deployment
 
 For production deployment:
@@ -155,4 +247,4 @@ uvicorn inkling.api:app --host 0.0.0.0 --port 8000
 - Hot reload is enabled for both frontend and backend during development
 - Backend logs will show in the terminal where `run_api.py` is running
 - Frontend errors and logs appear in the browser console
-
+- Use ngrok's web interface (http://localhost:4040) to inspect requests and debug issues
