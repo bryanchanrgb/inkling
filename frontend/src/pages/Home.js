@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import './Home.css';
 
@@ -47,9 +47,6 @@ function Home() {
     <div className="home">
       <div className="home-header">
         <h2>Topics</h2>
-        <Link to="/create-topic" className="btn btn-primary">
-          New Topic
-        </Link>
       </div>
 
       {error && <div className="error">{error}</div>}
