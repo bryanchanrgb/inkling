@@ -1,0 +1,158 @@
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.history-header h2 {
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.topic-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topic-filter label {
+  font-weight: 500;
+  color: #374151;
+}
+
+.topic-filter select {
+  min-width: 200px;
+  margin-bottom: 0;
+}
+
+.history-table-container {
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.history-table thead {
+  background-color: #f9fafb;
+}
+
+.history-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.history-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.history-table tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+.history-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.question-cell {
+  max-width: 300px;
+}
+
+.question-text {
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: #1f2937;
+}
+
+.topic-name {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.answer-cell {
+  max-width: 250px;
+  word-wrap: break-word;
+  color: #374151;
+}
+
+.correct-cell {
+  text-align: center;
+}
+
+.correct-badge {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 24px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.correct-badge.correct {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.correct-badge.incorrect {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.score-cell {
+  text-align: center;
+  color: #6b7280;
+}
+
+.date-cell {
+  white-space: nowrap;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .history-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .topic-filter {
+    width: 100%;
+  }
+
+  .topic-filter select {
+    width: 100%;
+    min-width: unset;
+  }
+
+  .history-table {
+    font-size: 14px;
+  }
+
+  .history-table th,
+  .history-table td {
+    padding: 8px;
+  }
+
+  .question-cell {
+    max-width: 200px;
+  }
+
+  .answer-cell {
+    max-width: 150px;
+  }
+}
+

@@ -228,6 +228,27 @@ class Storage:
         """Save multiple questions and return their IDs."""
         return [self.save_question(q) for q in questions]
     
+    def get_question(self, question_id: int) -> Optional[Question]:
+        """Get a question by ID."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT * FROM questions WHERE id = ?", (question_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row:
+            return Question(
+                id=row['id'],
+                topic_id=row['topic_id'],
+                question_text=row['question_text'],
+                correct_answer=row['correct_answer'],
+                subtopic=row['subtopic'],
+                difficulty=row['difficulty']
+            )
+        return None
+    
     def get_questions_for_topic(self, topic_id: int) -> List[Question]:
         """Get all questions for a topic."""
         conn = sqlite3.connect(self.db_path)
