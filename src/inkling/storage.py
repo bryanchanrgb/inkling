@@ -584,6 +584,30 @@ class Storage:
         
         return prerequisites
     
+    def get_subtopic_stats(self, topic_id: int) -> List[Dict[str, Any]]:
+        """Get performance statistics for each subtopic in a topic."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Aggregate stats from answers joined with questions
+        cursor.execute("""
+            SELECT 
+                q.subtopic,
+                COUNT(a.id) as total_answers,
+                SUM(CASE WHEN a.is_correct = 1 THEN 1 ELSE 0 END) as correct_answers,
+                AVG(a.understanding_score) as avg_score
+            FROM questions q
+            LEFT JOIN answers a ON q.id = a.question_id
+            WHERE q.topic_id = ?
+            GROUP BY q.subtopic
+        """, (topic_id,))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [dict(row) for row in rows]
+
     def delete_topic_graph(self, topic_id: int) -> None:
         """Delete all subtopics and relationships for a topic.
         

@@ -3,7 +3,8 @@
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,8 +18,14 @@ from .quiz_service import QuizService
 from .storage import Storage
 from .topic_service import TopicService
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("INFO:     Inkling API starting up...")
+    yield
+    print("INFO:     Inkling API shutting down...")
+
 # Initialize FastAPI app
-app = FastAPI(title="Inkling API", version="1.0.0")
+app = FastAPI(title="Inkling API", version="1.0.0", lifespan=lifespan)
 
 # Configure CORS
 app.add_middleware(
@@ -277,6 +284,14 @@ async def get_quiz_history(topic_id: Optional[int] = None, limit: int = 20):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/topics/{topic_id}/stats", response_model=List[Dict[str, Any]])
+async def get_topic_stats(topic_id: int):
+    """Get performance stats by subtopic for a topic."""
+    try:
+        return storage.get_subtopic_stats(topic_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/topics/{topic_id}/questions/generate", response_model=List[QuestionResponse])
 async def generate_additional_questions(topic_id: int):
     """Generate additional questions for a topic."""
@@ -315,4 +330,3 @@ async def get_topic_questions(topic_id: int):
         return [QuestionResponse.from_model(q) for q in questions]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

@@ -52,6 +52,10 @@ class ApiService {
     return this.request(`/topics/${topicId}/questions`);
   }
 
+  async getTopicStats(topicId) {
+    return this.request(`/topics/${topicId}/stats`);
+  }
+
   // Quizzes
   async startQuiz(topicId, numQuestions = null) {
     let url = `/quizzes/start?topic_id=${topicId}`;

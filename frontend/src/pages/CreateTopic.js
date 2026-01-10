@@ -11,18 +11,12 @@ function CreateTopic() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    if (!topicName.trim()) {
-      setError('Topic name cannot be empty');
-      return;
-    }
+    if (!topicName.trim()) return;
 
     try {
       setLoading(true);
       setError(null);
-      const result = await api.createTopic(topicName.trim());
-      
-      alert(`Topic "${result.topic.name}" created successfully!\n\n${result.questions.length} questions generated.\n${result.subtopics.length} subtopics created.`);
+      await api.createTopic(topicName.trim());
       navigate('/');
     } catch (err) {
       setError(err.message);
@@ -33,45 +27,42 @@ function CreateTopic() {
 
   return (
     <div className="create-topic">
-      <h2>Create New Topic</h2>
-      <div className="card">
-        <p className="info-text">
-          Enter a topic name and we'll generate a knowledge graph with subtopics and quiz questions using AI.
-          This may take a minute or two.
-        </p>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="error">{error}</div>}
-          <input
-            type="text"
-            className="input"
-            placeholder="Enter topic name (e.g., 'Machine Learning', 'World History')"
-            value={topicName}
-            onChange={(e) => setTopicName(e.target.value)}
+      <h2>Add Topic</h2>
+      <p className="description">
+        Enter a subject to begin. We'll generate a curated set of subtopics and questions to guide your learning.
+      </p>
+      
+      <form onSubmit={handleSubmit} className="create-form">
+        {error && <div className="error">{error}</div>}
+        <input
+          type="text"
+          className="input"
+          placeholder="e.g. Quantum Physics, Culinary Arts, French Grammar"
+          value={topicName}
+          onChange={(e) => setTopicName(e.target.value)}
+          disabled={loading}
+          autoFocus
+        />
+        <div className="actions">
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading || !topicName.trim()}
+          >
+            {loading ? 'Initializing...' : 'Confirm'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => navigate('/')}
             disabled={loading}
-            autoFocus
-          />
-          <div className="form-actions">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading || !topicName.trim()}
-            >
-              {loading ? 'Creating Topic...' : 'Create Topic'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/')}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
 
 export default CreateTopic;
-

@@ -7,7 +7,8 @@ function Home() {
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [generating, setGenerating] = useState({});
+  const [selectedTopicStats, setSelectedTopicStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   const navigate = useNavigate();
 
@@ -18,7 +19,6 @@ function Home() {
   const loadTopics = async () => {
     try {
       setLoading(true);
-      setError(null);
       const data = await api.getTopics();
       setTopics(data);
     } catch (err) {
@@ -28,70 +28,81 @@ function Home() {
     }
   };
 
-  const handleStartQuiz = (topicId) => {
-    navigate(`/quiz/${topicId}`);
-  };
-
-  const handleGenerateQuestions = async (topicId) => {
+  const handleViewProgress = async (topicId) => {
     try {
-      setGenerating({ ...generating, [topicId]: true });
-      await api.generateAdditionalQuestions(topicId);
-      alert('Additional questions generated successfully!');
-      loadTopics(); // Refresh to show updated question count
+      setLoadingStats(true);
+      const stats = await api.getTopicStats(topicId);
+      const topic = topics.find(t => t.id === topicId);
+      setSelectedTopicStats({ topic, stats });
     } catch (err) {
-      alert(`Error generating questions: ${err.message}`);
+      alert(`Error loading progress: ${err.message}`);
     } finally {
-      setGenerating({ ...generating, [topicId]: false });
+      setLoadingStats(false);
     }
   };
 
-  if (loading) {
-    return <div className="loading">Loading topics...</div>;
-  }
-
-  if (error) {
-    return <div className="error">Error: {error}</div>;
-  }
+  if (loading) return <div className="loading">Loading topics...</div>;
 
   return (
     <div className="home">
       <div className="home-header">
         <h2>Topics</h2>
         <Link to="/create-topic" className="btn btn-primary">
-          Create New Topic
+          New Topic
         </Link>
       </div>
 
-      {topics.length === 0 ? (
-        <div className="card">
-          <p>No topics yet. Create your first topic to get started!</p>
-        </div>
-      ) : (
-        <div className="topics-grid">
-          {topics.map((topic) => (
-            <div key={topic.id} className="topic-card">
+      {error && <div className="error">{error}</div>}
+
+      <div className="topics-list">
+        {topics.map((topic) => (
+          <div key={topic.id} className="topic-item">
+            <div className="topic-info">
               <h3>{topic.name}</h3>
-              {topic.description && <p className="topic-description">{topic.description}</p>}
-              {topic.created_at && (
-                <p className="topic-date">Created: {new Date(topic.created_at).toLocaleDateString()}</p>
-              )}
-              <div className="topic-actions">
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleStartQuiz(topic.id)}
-                >
-                  Start Quiz
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => handleGenerateQuestions(topic.id)}
-                  disabled={generating[topic.id]}
-                >
-                  {generating[topic.id] ? 'Generating...' : 'Generate Questions'}
-                </button>
-              </div>
+              <p className="topic-date">{new Date(topic.created_at).toLocaleDateString()}</p>
             </div>
-          ))}
+            <div className="topic-actions">
+              <button className="btn btn-primary" onClick={() => navigate(`/quiz/${topic.id}`)}>
+                Quiz
+              </button>
+              <button className="btn btn-secondary" onClick={() => handleViewProgress(topic.id)}>
+                Progress
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {selectedTopicStats && (
+        <div className="modal-overlay" onClick={() => setSelectedTopicStats(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{selectedTopicStats.topic.name} Progress</h2>
+              <button className="close-btn" onClick={() => setSelectedTopicStats(null)}>&times;</button>
+            </div>
+            <div className="stats-list">
+              {selectedTopicStats.stats.length === 0 ? (
+                <p className="no-data">No progress recorded yet for this topic.</p>
+              ) : (
+                selectedTopicStats.stats.map((stat, idx) => (
+                  <div key={idx} className="stat-item">
+                    <div className="stat-info">
+                      <span className="stat-name">{stat.subtopic || 'General'}</span>
+                      <div className="stat-bars">
+                        <div className="bar-total">
+                          <div 
+                            className="bar-correct" 
+                            style={{ width: `${(stat.correct_answers / stat.total_answers) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="stat-count">{stat.correct_answers}/{stat.total_answers}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -99,4 +110,3 @@ function Home() {
 }
 
 export default Home;
-

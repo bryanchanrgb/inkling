@@ -1,27 +1,36 @@
+.create-topic {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
 .create-topic h2 {
-  font-size: 28px;
-  font-weight: 600;
-  margin-bottom: 24px;
+  font-size: 36px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  letter-spacing: -0.02em;
 }
 
-.info-text {
-  color: #6b7280;
-  margin-bottom: 24px;
-  line-height: 1.6;
+.create-topic .description {
+  color: var(--text-muted);
+  margin-bottom: 48px;
+  font-size: 16px;
 }
 
-.form-actions {
+.create-form {
+  margin-top: 32px;
+}
+
+.actions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 
-.form-actions .btn {
+.actions .btn {
   flex: 1;
 }
 
 @media (max-width: 768px) {
-  .form-actions {
+  .actions {
     flex-direction: column;
   }
 }
-
